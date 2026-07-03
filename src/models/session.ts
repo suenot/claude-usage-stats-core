@@ -30,6 +30,11 @@ export interface Summary {
   today_cost: number;
   week_cost: number;
   month_cost: number;
+  // Averages over ACTIVE periods only — days/months where tokens were actually spent.
+  active_days: number;
+  active_months: number;
+  avg_per_active_day: number;
+  avg_per_active_month: number;
   session_counts: Record<string, number>;
 }
 

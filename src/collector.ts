@@ -72,6 +72,16 @@ export function buildSummary(sessions: Session[]): Summary {
   const monthCost = sessions.filter(s => s.date.startsWith(currentMonth)).reduce((s, x) => s + x.cost, 0);
   const weekCost = getWeekCost(sessions);
 
+  // Averages count only ACTIVE periods — days/months with actual spend, not calendar span.
+  const activeDays = new Set<string>();
+  for (const s of sessions) {
+    if (s.cost > 0) activeDays.add(s.date);
+  }
+  const activeMonths = new Set<string>();
+  for (const d of activeDays) activeMonths.add(d.substring(0, 7));
+  const avgPerActiveDay = activeDays.size ? grandTotal / activeDays.size : 0;
+  const avgPerActiveMonth = activeMonths.size ? grandTotal / activeMonths.size : 0;
+
   return {
     generated_at: new Date().toISOString(),
     today,
@@ -80,6 +90,10 @@ export function buildSummary(sessions: Session[]): Summary {
     today_cost: parseFloat(todayCost.toFixed(2)),
     week_cost: parseFloat(weekCost.toFixed(2)),
     month_cost: parseFloat(monthCost.toFixed(2)),
+    active_days: activeDays.size,
+    active_months: activeMonths.size,
+    avg_per_active_day: parseFloat(avgPerActiveDay.toFixed(2)),
+    avg_per_active_month: parseFloat(avgPerActiveMonth.toFixed(2)),
     session_counts: { ...sourceCounts, total: sessions.length },
   };
 }
