@@ -53,6 +53,13 @@ export function collect(options?: { cacheDir?: string; verbose?: boolean }): Col
   return { sessions: allSessions, summary, sourceResults };
 }
 
+function median(nums: number[]): number {
+  if (nums.length === 0) return 0;
+  const sorted = [...nums].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+}
+
 export function buildSummary(sessions: Session[]): Summary {
   const today = toLocalDate(Date.now()) || new Date().toISOString().split('T')[0];
   const currentMonth = today.substring(0, 7);
@@ -72,15 +79,21 @@ export function buildSummary(sessions: Session[]): Summary {
   const monthCost = sessions.filter(s => s.date.startsWith(currentMonth)).reduce((s, x) => s + x.cost, 0);
   const weekCost = getWeekCost(sessions);
 
-  // Averages count only ACTIVE periods — days/months with actual spend, not calendar span.
-  const activeDays = new Set<string>();
+  // Stats count only ACTIVE periods — days/months with actual spend, not calendar span.
+  const dayTotals: Record<string, number> = {};
+  const monthTotals: Record<string, number> = {};
   for (const s of sessions) {
-    if (s.cost > 0) activeDays.add(s.date);
+    if (s.cost <= 0) continue;
+    dayTotals[s.date] = (dayTotals[s.date] || 0) + s.cost;
+    const m = s.date.substring(0, 7);
+    monthTotals[m] = (monthTotals[m] || 0) + s.cost;
   }
-  const activeMonths = new Set<string>();
-  for (const d of activeDays) activeMonths.add(d.substring(0, 7));
-  const avgPerActiveDay = activeDays.size ? grandTotal / activeDays.size : 0;
-  const avgPerActiveMonth = activeMonths.size ? grandTotal / activeMonths.size : 0;
+  const dayValues = Object.values(dayTotals);
+  const monthValues = Object.values(monthTotals);
+  const activeDays = dayValues.length;
+  const activeMonths = monthValues.length;
+  const avgPerActiveDay = activeDays ? grandTotal / activeDays : 0;
+  const avgPerActiveMonth = activeMonths ? grandTotal / activeMonths : 0;
 
   return {
     generated_at: new Date().toISOString(),
@@ -90,10 +103,12 @@ export function buildSummary(sessions: Session[]): Summary {
     today_cost: parseFloat(todayCost.toFixed(2)),
     week_cost: parseFloat(weekCost.toFixed(2)),
     month_cost: parseFloat(monthCost.toFixed(2)),
-    active_days: activeDays.size,
-    active_months: activeMonths.size,
+    active_days: activeDays,
+    active_months: activeMonths,
     avg_per_active_day: parseFloat(avgPerActiveDay.toFixed(2)),
     avg_per_active_month: parseFloat(avgPerActiveMonth.toFixed(2)),
+    median_per_active_day: parseFloat(median(dayValues).toFixed(2)),
+    median_per_active_month: parseFloat(median(monthValues).toFixed(2)),
     session_counts: { ...sourceCounts, total: sessions.length },
   };
 }

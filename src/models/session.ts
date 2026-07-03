@@ -35,6 +35,8 @@ export interface Summary {
   active_months: number;
   avg_per_active_day: number;
   avg_per_active_month: number;
+  median_per_active_day: number;
+  median_per_active_month: number;
   session_counts: Record<string, number>;
 }
 
