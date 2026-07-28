@@ -5,9 +5,18 @@ export interface ModelPricing {
   cacheRead: number;
 }
 
+// GLM 5.2 (Zhipu, via proxy). Claude Code transcripts routed through the GLM
+// backend do not record a model field, so those sessions arrive as empty/
+// "unknown". In this setup every unlabeled session IS a GLM 5.2 call, so the
+// empty/unknown/fallback case prices as GLM. Input/output per the user's plan;
+// cache_read = official Z.ai cached-input rate, cache_write = 0 (free storage).
+const GLM_PRICING: ModelPricing = { input: 0.76, output: 2.42, cacheWrite: 0, cacheRead: 0.11 };
+
 export function getPricing(model: string | undefined): ModelPricing {
-  if (!model) return { input: 3, output: 15, cacheWrite: 3.75, cacheRead: 0.30 };
+  // No model recorded → GLM 5.2 proxy session (see above).
+  if (!model) return GLM_PRICING;
   const m = model.toLowerCase();
+  if (m === 'unknown' || m.includes('glm')) return GLM_PRICING;
 
   if (m.includes('opus-4-6') || m.includes('opus-4.6') || m.includes('opus-4-5') || m.includes('opus-4.5'))
     return { input: 5, output: 25, cacheWrite: 6.25, cacheRead: 0.50 };
@@ -22,13 +31,17 @@ export function getPricing(model: string | undefined): ModelPricing {
   if (m.includes('haiku'))
     return { input: 0.25, output: 1.25, cacheWrite: 0.30, cacheRead: 0.03 };
 
-  return { input: 3, output: 15, cacheWrite: 3.75, cacheRead: 0.30 };
+  // Unmatched non-empty model → also GLM (proxy sessions occasionally leak a
+  // non-Claude id). Keeps the "unknown = GLM" invariant from the user's setup.
+  return GLM_PRICING;
 }
 
 export function getModelFamily(model: string): string {
-  const m = model.toLowerCase();
+  const m = (model || '').toLowerCase();
+  if (!m || m === 'unknown' || m.includes('glm')) return 'GLM 5.2';
   if (m.includes('opus')) return 'Opus';
   if (m.includes('sonnet')) return 'Sonnet';
   if (m.includes('haiku')) return 'Haiku';
-  return 'Unknown';
+  if (m.includes('fable')) return 'Fable';
+  return 'GLM 5.2';
 }
