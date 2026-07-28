@@ -1,7 +1,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { DayEntry, Session } from '../models/session.js';
-import { makeDayEntry } from '../models/session.js';
+import { addUsage, finalizeHours, makeDayEntry } from '../models/session.js';
 import { getPricing } from '../models/pricing.js';
 import { toLocalDate, toLocalTime, parseTimestamp } from '../utils/date.js';
 import { parseJsonlFileSync } from '../utils/jsonl.js';
@@ -25,26 +25,29 @@ function parseOpenClawFormat(filePath: string): Record<string, DayEntry> {
 
     if (!dayData[date]) dayData[date] = makeDayEntry();
     const dd = dayData[date];
-    if (time) dd.times.push(time);
 
     const model = ((msg && (msg as Record<string, unknown>).model) || entry.model || '') as string;
     if (model && model.startsWith('claude')) dd.models.add(model);
 
-    const cost = usage.cost as Record<string, number> | undefined;
-    if (cost && cost.total) {
-      dd.cost += cost.total;
+    const inp = (usage.input as number) || 0;
+    const out = (usage.output as number) || 0;
+    const cr = (usage.cacheRead as number) || 0;
+    const cw = (usage.cacheWrite as number) || 0;
+
+    // OpenClaw records its own cost total; fall back to our pricing table only
+    // when it does not.
+    const reported = usage.cost as Record<string, number> | undefined;
+    let recordCost: number;
+    if (reported && reported.total) {
+      recordCost = reported.total;
     } else {
       const pricing = getPricing(model);
-      const inp = (usage.input as number) || 0;
-      const out = (usage.output as number) || 0;
-      const cr = (usage.cacheRead as number) || 0;
-      const cw = (usage.cacheWrite as number) || 0;
-      dd.cost += (inp * pricing.input + out * pricing.output + cw * pricing.cacheWrite + cr * pricing.cacheRead) / 1000000;
+      recordCost = (inp * pricing.input + out * pricing.output + cw * pricing.cacheWrite + cr * pricing.cacheRead) / 1000000;
     }
-    dd.input_tokens += ((usage.input as number) || 0);
-    dd.output_tokens += ((usage.output as number) || 0);
-    dd.cache_read += ((usage.cacheRead as number) || 0);
-    dd.cache_write += ((usage.cacheWrite as number) || 0);
+
+    addUsage(dd, time, {
+      input_tokens: inp, output_tokens: out, cache_read: cr, cache_write: cw, cost: recordCost,
+    });
   }
   return dayData;
 }
@@ -73,6 +76,7 @@ export function collectOpenClaw(): Session[] {
             input_tokens: data.input_tokens, output_tokens: data.output_tokens,
             cache_read: data.cache_read, cache_write: data.cache_write,
             model: models[models.length - 1] || '',
+            hours: finalizeHours(data.hours),
           });
         }
       } catch {}

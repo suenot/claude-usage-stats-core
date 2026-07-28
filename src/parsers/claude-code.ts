@@ -1,7 +1,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { DayEntry, Session, ConversationTurn } from '../models/session.js';
-import { makeDayEntry } from '../models/session.js';
+import { addUsage, finalizeHours, makeDayEntry } from '../models/session.js';
 import { getPricing } from '../models/pricing.js';
 import { toLocalDate, toLocalTime, parseTimestamp } from '../utils/date.js';
 import { findJsonlFiles, parseJsonlFileSync } from '../utils/jsonl.js';
@@ -81,18 +81,18 @@ function parseClaudeCodeFormat(filePath: string): Record<string, DayEntry> {
 
     if (!dayData[date]) dayData[date] = makeDayEntry();
     const dd = dayData[date];
-    if (time) dd.times.push(time);
 
     const model = ((msg && (msg as Record<string, unknown>).model) || entry.model || '') as string;
     if (model && model.startsWith('claude')) dd.models.add(model);
 
-    dd.input_tokens += inputTok;
-    dd.output_tokens += outputTok;
-    dd.cache_read += cacheRead;
-    dd.cache_write += cacheWrite;
-
     const pricing = getPricing(model);
-    dd.cost += (inputTok * pricing.input + outputTok * pricing.output + cacheWrite * pricing.cacheWrite + cacheRead * pricing.cacheRead) / 1000000;
+    addUsage(dd, time, {
+      input_tokens: inputTok,
+      output_tokens: outputTok,
+      cache_read: cacheRead,
+      cache_write: cacheWrite,
+      cost: (inputTok * pricing.input + outputTok * pricing.output + cacheWrite * pricing.cacheWrite + cacheRead * pricing.cacheRead) / 1000000,
+    });
   }
   return dayData;
 }
@@ -119,6 +119,7 @@ function pushSessions(
       cache_read: data.cache_read,
       cache_write: data.cache_write,
       model: models[models.length - 1] || '',
+      hours: finalizeHours(data.hours),
     };
     if (meta.title) entry.title = meta.title;
     if (meta.sessionId) entry.sessionId = meta.sessionId;
