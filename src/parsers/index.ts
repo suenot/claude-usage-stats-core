@@ -2,3 +2,4 @@ export { collectClaudeCode, collectClaudeDesktop, collectCursor, collectWindsurf
 export { collectOpenClaw } from './openclaw.js';
 export { collectAider } from './aider.js';
 export { collectContinue } from './continue.js';
+export { collectCodex } from './codex.js';

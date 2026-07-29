@@ -8,6 +8,7 @@ import {
 import { collectOpenClaw } from './parsers/openclaw.js';
 import { collectAider } from './parsers/aider.js';
 import { collectContinue } from './parsers/continue.js';
+import { collectCodex } from './parsers/codex.js';
 
 export interface CollectorResult {
   sessions: Session[];
@@ -18,6 +19,7 @@ export interface CollectorResult {
 const ALL_COLLECTORS = [
   { name: 'OpenClaw / Clawdbot', fn: collectOpenClaw },
   { name: 'Claude Code CLI', fn: collectClaudeCode },
+  { name: 'Codex', fn: collectCodex },
   { name: 'Claude Desktop', fn: collectClaudeDesktop },
   { name: 'Cursor', fn: collectCursor },
   { name: 'Windsurf', fn: collectWindsurf },
