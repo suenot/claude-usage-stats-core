@@ -31,6 +31,13 @@ export function getPricing(model: string | undefined): ModelPricing {
   if (m.includes('haiku'))
     return { input: 0.25, output: 1.25, cacheWrite: 0.30, cacheRead: 0.03 };
 
+  if (m.includes('gpt-5.6-luna'))
+    return { input: 0.50, output: 3, cacheWrite: 0, cacheRead: 0.05 };
+  if (m.includes('gpt-5.6-terra'))
+    return { input: 2.50, output: 15, cacheWrite: 0, cacheRead: 0.25 };
+  if (m.includes('gpt-5.6-sol'))
+    return { input: 5, output: 30, cacheWrite: 0, cacheRead: 0.50 };
+
   // Unmatched non-empty model → also GLM (proxy sessions occasionally leak a
   // non-Claude id). Keeps the "unknown = GLM" invariant from the user's setup.
   return GLM_PRICING;

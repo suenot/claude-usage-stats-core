@@ -2,6 +2,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { DayEntry, Session } from '../models/session.js';
 import { addUsage, finalizeHours, makeDayEntry } from '../models/session.js';
+import { getPricing } from '../models/pricing.js';
 import { toLocalDate, toLocalTime, parseTimestamp } from '../utils/date.js';
 import { findJsonlFiles, parseJsonlFileSync } from '../utils/jsonl.js';
 import { cleanMessageText, extractText } from '../utils/text.js';
@@ -18,6 +19,7 @@ function parseCodexFile(filePath: string): { dayData: Record<string, DayEntry>; 
   const dayData: Record<string, DayEntry> = {};
   const meta: CodexMeta = { sessionId: '', cwd: '', title: '', history: [] };
   let fallbackDate: string | null = null;
+  let currentModel = '';
   try { fallbackDate = toLocalDate(fs.statSync(filePath).mtimeMs); } catch {}
 
   for (const entry of entries) {
@@ -42,6 +44,11 @@ function parseCodexFile(filePath: string): { dayData: Record<string, DayEntry>; 
       continue;
     }
 
+    if (entry.type === 'turn_context') {
+      currentModel = String(payload.model || currentModel);
+      continue;
+    }
+
     if (entry.type !== 'event_msg' || payload.type !== 'token_count') continue;
     const info = payload.info as Record<string, unknown> | undefined;
     const usage = info?.last_token_usage as Record<string, number> | undefined;
@@ -58,12 +65,14 @@ function parseCodexFile(filePath: string): { dayData: Record<string, DayEntry>; 
     const time = tsMs ? toLocalTime(tsMs) : '00:00';
     if (!date) continue;
     if (!dayData[date]) dayData[date] = makeDayEntry();
+    if (currentModel) dayData[date].models.add(currentModel);
+    const pricing = getPricing(currentModel);
     addUsage(dayData[date], time, {
       input_tokens: inputTok,
       output_tokens: outputTok,
       cache_read: cacheRead,
       cache_write: 0,
-      cost: 0,
+      cost: (inputTok * pricing.input + outputTok * pricing.output + cacheRead * pricing.cacheRead) / 1000000,
     });
   }
 
@@ -81,17 +90,18 @@ export function collectCodex(): Session[] {
       for (const [date, data] of Object.entries(dayData)) {
         const tokenCount = data.input_tokens + data.output_tokens + data.cache_read;
         if (tokenCount === 0) continue;
+        const models = [...data.models];
         sessions.push({
           date,
           time: data.times.sort()[0] || '00:00',
           source: 'Codex',
           file: path.basename(filePath),
-          cost: 0,
+          cost: parseFloat(data.cost.toFixed(4)),
           input_tokens: data.input_tokens,
           output_tokens: data.output_tokens,
           cache_read: data.cache_read,
           cache_write: 0,
-          model: 'Codex',
+          model: models[models.length - 1] || 'Codex',
           title: meta.title || undefined,
           sessionId: meta.sessionId || undefined,
           cwd: meta.cwd || undefined,
