@@ -46,6 +46,9 @@ export function getPricing(model: string | undefined): ModelPricing {
 export function getModelFamily(model: string): string {
   const m = (model || '').toLowerCase();
   if (!m || m === 'unknown' || m.includes('glm')) return 'GLM 5.2';
+  if (m.includes('gpt-5.6-luna')) return 'Codex Luna';
+  if (m.includes('gpt-5.6-terra')) return 'Codex Terra';
+  if (m.includes('gpt-5.6-sol')) return 'Codex Sol';
   if (m.includes('opus')) return 'Opus';
   if (m.includes('sonnet')) return 'Sonnet';
   if (m.includes('haiku')) return 'Haiku';
