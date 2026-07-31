@@ -1,4 +1,4 @@
-export type { Session, Summary, DayEntry, ConversationTurn, HourBucket } from './models/session.js';
+export type { Session, Summary, DayEntry, ConversationTurn, HourBucket, UsageEvent } from './models/session.js';
 export type { Source } from './models/source.js';
 export type { ModelPricing } from './models/pricing.js';
 export type { CollectorResult } from './collector.js';

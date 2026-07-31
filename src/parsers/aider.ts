@@ -37,13 +37,20 @@ function parseAiderFormat(filePath: string): Record<string, DayEntry> {
     if (model && model.includes('claude')) dd.models.add(model);
 
     const pricing = getPricing(model);
-    addUsage(dd, time, {
+    const record = {
       input_tokens: inputTok,
       output_tokens: outputTok,
       cache_read: cacheRead,
       cache_write: cacheWrite,
       cost: (inputTok * pricing.input + outputTok * pricing.output + cacheWrite * pricing.cacheWrite + cacheRead * pricing.cacheRead) / 1000000,
-    });
+    };
+    addUsage(dd, time, record, tsMs ? {
+      ...record,
+      timestamp_ms: tsMs,
+      model,
+      cache_write_5m: 0,
+      cache_write_1h: 0,
+    } : undefined);
   }
   return dayData;
 }
@@ -72,6 +79,7 @@ export function collectAider(): Session[] {
             cache_read: data.cache_read, cache_write: data.cache_write,
             model: models[models.length - 1] || '',
             hours: finalizeHours(data.hours),
+            events: data.events,
           });
         }
       }

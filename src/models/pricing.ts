@@ -2,6 +2,7 @@ export interface ModelPricing {
   input: number;
   output: number;
   cacheWrite: number;
+  cacheWrite1h: number;
   cacheRead: number;
 }
 
@@ -10,7 +11,7 @@ export interface ModelPricing {
 // "unknown". In this setup every unlabeled session IS a GLM 5.2 call, so the
 // empty/unknown/fallback case prices as GLM. Input/output per the user's plan;
 // cache_read = official Z.ai cached-input rate, cache_write = 0 (free storage).
-const GLM_PRICING: ModelPricing = { input: 0.76, output: 2.42, cacheWrite: 0, cacheRead: 0.11 };
+const GLM_PRICING: ModelPricing = { input: 0.76, output: 2.42, cacheWrite: 0, cacheWrite1h: 0, cacheRead: 0.11 };
 
 export function getPricing(model: string | undefined): ModelPricing {
   // No model recorded → GLM 5.2 proxy session (see above).
@@ -18,25 +19,29 @@ export function getPricing(model: string | undefined): ModelPricing {
   const m = model.toLowerCase();
   if (m === 'unknown' || m.includes('glm')) return GLM_PRICING;
 
-  if (m.includes('opus-4-6') || m.includes('opus-4.6') || m.includes('opus-4-5') || m.includes('opus-4.5'))
-    return { input: 5, output: 25, cacheWrite: 6.25, cacheRead: 0.50 };
+  if (m.includes('fable-5'))
+    return { input: 10, output: 50, cacheWrite: 12.50, cacheWrite1h: 20, cacheRead: 1 };
+  if (m.includes('opus-5') || m.includes('opus-4-8') || m.includes('opus-4.8') ||
+      m.includes('opus-4-7') || m.includes('opus-4.7') ||
+      m.includes('opus-4-6') || m.includes('opus-4.6') || m.includes('opus-4-5') || m.includes('opus-4.5'))
+    return { input: 5, output: 25, cacheWrite: 6.25, cacheWrite1h: 10, cacheRead: 0.50 };
   if (m.includes('opus-4-1') || m.includes('opus-4.1'))
-    return { input: 15, output: 75, cacheWrite: 18.75, cacheRead: 1.50 };
+    return { input: 15, output: 75, cacheWrite: 18.75, cacheWrite1h: 30, cacheRead: 1.50 };
   if (m.includes('opus'))
-    return { input: 15, output: 75, cacheWrite: 18.75, cacheRead: 1.50 };
+    return { input: 15, output: 75, cacheWrite: 18.75, cacheWrite1h: 30, cacheRead: 1.50 };
   if (m.includes('sonnet'))
-    return { input: 3, output: 15, cacheWrite: 3.75, cacheRead: 0.30 };
+    return { input: 3, output: 15, cacheWrite: 3.75, cacheWrite1h: 6, cacheRead: 0.30 };
   if (m.includes('haiku-4-5') || m.includes('haiku-4.5'))
-    return { input: 1, output: 5, cacheWrite: 1.25, cacheRead: 0.10 };
+    return { input: 1, output: 5, cacheWrite: 1.25, cacheWrite1h: 2, cacheRead: 0.10 };
   if (m.includes('haiku'))
-    return { input: 0.25, output: 1.25, cacheWrite: 0.30, cacheRead: 0.03 };
+    return { input: 0.25, output: 1.25, cacheWrite: 0.30, cacheWrite1h: 0.50, cacheRead: 0.03 };
 
   if (m.includes('gpt-5.6-luna'))
-    return { input: 0.50, output: 3, cacheWrite: 0, cacheRead: 0.05 };
+    return { input: 0.50, output: 3, cacheWrite: 0, cacheWrite1h: 0, cacheRead: 0.05 };
   if (m.includes('gpt-5.6-terra'))
-    return { input: 2.50, output: 15, cacheWrite: 0, cacheRead: 0.25 };
+    return { input: 2.50, output: 15, cacheWrite: 0, cacheWrite1h: 0, cacheRead: 0.25 };
   if (m.includes('gpt-5.6-sol'))
-    return { input: 5, output: 30, cacheWrite: 0, cacheRead: 0.50 };
+    return { input: 5, output: 30, cacheWrite: 0, cacheWrite1h: 0, cacheRead: 0.50 };
 
   // Unmatched non-empty model → also GLM (proxy sessions occasionally leak a
   // non-Claude id). Keeps the "unknown = GLM" invariant from the user's setup.

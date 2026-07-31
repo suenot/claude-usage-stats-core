@@ -45,9 +45,16 @@ function parseOpenClawFormat(filePath: string): Record<string, DayEntry> {
       recordCost = (inp * pricing.input + out * pricing.output + cw * pricing.cacheWrite + cr * pricing.cacheRead) / 1000000;
     }
 
-    addUsage(dd, time, {
+    const record = {
       input_tokens: inp, output_tokens: out, cache_read: cr, cache_write: cw, cost: recordCost,
-    });
+    };
+    addUsage(dd, time, record, tsMs ? {
+      ...record,
+      timestamp_ms: tsMs,
+      model,
+      cache_write_5m: 0,
+      cache_write_1h: 0,
+    } : undefined);
   }
   return dayData;
 }
@@ -77,6 +84,7 @@ export function collectOpenClaw(): Session[] {
             cache_read: data.cache_read, cache_write: data.cache_write,
             model: models[models.length - 1] || '',
             hours: finalizeHours(data.hours),
+            events: data.events,
           });
         }
       } catch {}

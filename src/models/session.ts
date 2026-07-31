@@ -13,6 +13,13 @@ export interface HourBucket {
   cache_write: number;
 }
 
+export interface UsageEvent extends HourBucket {
+  timestamp_ms: number;
+  model: string;
+  cache_write_5m: number;
+  cache_write_1h: number;
+}
+
 export interface Session {
   date: string;
   time: string;
@@ -33,6 +40,9 @@ export interface Session {
   // a day-long session would land entirely in its opening hour. This carries
   // the real distribution, folded in at parse time.
   hours?: Record<number, HourBucket>;
+  // Exact per-request usage retained for sequence-dependent metrics such as
+  // cache expiry. Legacy sessions may not have these events.
+  events?: UsageEvent[];
 }
 
 export interface Summary {
@@ -62,6 +72,7 @@ export interface DayEntry {
   models: Set<string>;
   times: string[];
   hours: Record<number, HourBucket>;
+  events: UsageEvent[];
 }
 
 export function makeHourBucket(): HourBucket {
@@ -69,19 +80,20 @@ export function makeHourBucket(): HourBucket {
 }
 
 export function makeDayEntry(): DayEntry {
-  return { cost: 0, input_tokens: 0, output_tokens: 0, cache_read: 0, cache_write: 0, models: new Set(), times: [], hours: {} };
+  return { cost: 0, input_tokens: 0, output_tokens: 0, cache_read: 0, cache_write: 0, models: new Set(), times: [], hours: {}, events: [] };
 }
 
 // Folds one usage record into its day totals AND its hour-of-day bucket.
 // Every parser goes through here: parse time is the only point where the
 // per-message timestamp still exists, so this is the single place hour-level
 // attribution can be captured at all.
-export function addUsage(day: DayEntry, time: string | null, usage: HourBucket): void {
+export function addUsage(day: DayEntry, time: string | null, usage: HourBucket, event?: UsageEvent): void {
   day.cost += usage.cost;
   day.input_tokens += usage.input_tokens;
   day.output_tokens += usage.output_tokens;
   day.cache_read += usage.cache_read;
   day.cache_write += usage.cache_write;
+  if (event && Number.isFinite(event.timestamp_ms) && event.timestamp_ms > 0) day.events.push(event);
   if (!time) return;
   day.times.push(time);
 

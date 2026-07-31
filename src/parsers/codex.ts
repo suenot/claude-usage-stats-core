@@ -56,9 +56,10 @@ function parseCodexFile(filePath: string): { dayData: Record<string, DayEntry>; 
 
     const totalInput = usage.input_tokens || 0;
     const cacheRead = usage.cached_input_tokens || 0;
-    const inputTok = Math.max(0, totalInput - cacheRead);
+    const cacheWrite = usage.cache_write_input_tokens || 0;
+    const inputTok = Math.max(0, totalInput - cacheRead - cacheWrite);
     const outputTok = (usage.output_tokens || 0) + (usage.reasoning_output_tokens || 0);
-    if (inputTok === 0 && outputTok === 0 && cacheRead === 0) continue;
+    if (inputTok === 0 && outputTok === 0 && cacheRead === 0 && cacheWrite === 0) continue;
 
     const tsMs = parseTimestamp(entry.timestamp);
     const date = tsMs ? toLocalDate(tsMs) : fallbackDate;
@@ -67,13 +68,20 @@ function parseCodexFile(filePath: string): { dayData: Record<string, DayEntry>; 
     if (!dayData[date]) dayData[date] = makeDayEntry();
     if (currentModel) dayData[date].models.add(currentModel);
     const pricing = getPricing(currentModel);
-    addUsage(dayData[date], time, {
+    const record = {
       input_tokens: inputTok,
       output_tokens: outputTok,
       cache_read: cacheRead,
-      cache_write: 0,
-      cost: (inputTok * pricing.input + outputTok * pricing.output + cacheRead * pricing.cacheRead) / 1000000,
-    });
+      cache_write: cacheWrite,
+      cost: (inputTok * pricing.input + outputTok * pricing.output + cacheWrite * pricing.cacheWrite + cacheRead * pricing.cacheRead) / 1000000,
+    };
+    addUsage(dayData[date], time, record, tsMs ? {
+      ...record,
+      timestamp_ms: tsMs,
+      model: currentModel,
+      cache_write_5m: 0,
+      cache_write_1h: 0,
+    } : undefined);
   }
 
   return { dayData, meta };
@@ -88,7 +96,7 @@ export function collectCodex(): Session[] {
     try {
       const { dayData, meta } = parseCodexFile(filePath);
       for (const [date, data] of Object.entries(dayData)) {
-        const tokenCount = data.input_tokens + data.output_tokens + data.cache_read;
+        const tokenCount = data.input_tokens + data.output_tokens + data.cache_read + data.cache_write;
         if (tokenCount === 0) continue;
         const models = [...data.models];
         sessions.push({
@@ -100,13 +108,14 @@ export function collectCodex(): Session[] {
           input_tokens: data.input_tokens,
           output_tokens: data.output_tokens,
           cache_read: data.cache_read,
-          cache_write: 0,
+          cache_write: data.cache_write,
           model: models[models.length - 1] || 'Codex',
           title: meta.title || undefined,
           sessionId: meta.sessionId || undefined,
           cwd: meta.cwd || undefined,
           history: meta.history && meta.history.length > 0 ? meta.history : undefined,
           hours: finalizeHours(data.hours),
+          events: data.events,
         });
       }
     } catch {}

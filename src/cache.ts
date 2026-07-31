@@ -10,7 +10,8 @@ const CACHE_FILENAME = 'sessions-cache.json';
 // timestamps it was built from live only in the source files — so a mismatch
 // discards the cache and forces a full recollect.
 // 2: per-hour usage buckets (Session.hours).
-const CACHE_VERSION = 2;
+// 3: exact per-request usage events (Session.events).
+const CACHE_VERSION = 3;
 
 interface CacheFile {
   version: number;

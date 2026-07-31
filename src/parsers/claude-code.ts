@@ -65,13 +65,13 @@ function parseClaudeCodeFormat(filePath: string): Record<string, DayEntry> {
 
   for (const entry of entries) {
     const msg = entry.message as Record<string, unknown> | undefined;
-    const usage = ((msg && (msg as Record<string, unknown>).usage) || entry.usage) as Record<string, number> | undefined;
+    const usage = ((msg && (msg as Record<string, unknown>).usage) || entry.usage) as Record<string, unknown> | undefined;
     if (!usage) continue;
 
-    const inputTok = usage.input_tokens || 0;
-    const outputTok = usage.output_tokens || 0;
-    const cacheWrite = usage.cache_creation_input_tokens || 0;
-    const cacheRead = usage.cache_read_input_tokens || 0;
+    const inputTok = Number(usage.input_tokens) || 0;
+    const outputTok = Number(usage.output_tokens) || 0;
+    const cacheWrite = Number(usage.cache_creation_input_tokens) || 0;
+    const cacheRead = Number(usage.cache_read_input_tokens) || 0;
     if (inputTok === 0 && outputTok === 0 && cacheRead === 0 && cacheWrite === 0) continue;
 
     const tsMs = parseTimestamp(entry.timestamp) || parseTimestamp(msg && (msg as Record<string, unknown>).timestamp);
@@ -86,13 +86,30 @@ function parseClaudeCodeFormat(filePath: string): Record<string, DayEntry> {
     if (model && model.startsWith('claude')) dd.models.add(model);
 
     const pricing = getPricing(model);
-    addUsage(dd, time, {
+    const cacheCreation = usage.cache_creation as Record<string, unknown> | undefined;
+    const rawWrite5m = Math.max(0, Number(cacheCreation?.ephemeral_5m_input_tokens) || 0);
+    const rawWrite1h = Math.max(0, Number(cacheCreation?.ephemeral_1h_input_tokens) || 0);
+    const cacheWrite5m = Math.min(rawWrite5m, cacheWrite);
+    const cacheWrite1h = Math.min(rawWrite1h, Math.max(0, cacheWrite - cacheWrite5m));
+    const unclassifiedWrite = Math.max(0, cacheWrite - cacheWrite5m - cacheWrite1h);
+    const record = {
       input_tokens: inputTok,
       output_tokens: outputTok,
       cache_read: cacheRead,
       cache_write: cacheWrite,
-      cost: (inputTok * pricing.input + outputTok * pricing.output + cacheWrite * pricing.cacheWrite + cacheRead * pricing.cacheRead) / 1000000,
-    });
+      cost: (
+        inputTok * pricing.input + outputTok * pricing.output +
+        (cacheWrite5m + unclassifiedWrite) * pricing.cacheWrite +
+        cacheWrite1h * pricing.cacheWrite1h + cacheRead * pricing.cacheRead
+      ) / 1000000,
+    };
+    addUsage(dd, time, record, tsMs ? {
+      ...record,
+      timestamp_ms: tsMs,
+      model,
+      cache_write_5m: cacheWrite5m,
+      cache_write_1h: cacheWrite1h,
+    } : undefined);
   }
   return dayData;
 }
@@ -120,6 +137,7 @@ function pushSessions(
       cache_write: data.cache_write,
       model: models[models.length - 1] || '',
       hours: finalizeHours(data.hours),
+      events: data.events,
     };
     if (meta.title) entry.title = meta.title;
     if (meta.sessionId) entry.sessionId = meta.sessionId;
