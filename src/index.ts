@@ -12,3 +12,4 @@ export { toLocalDate, toLocalTime, parseTimestamp, getISOWeekStart, getWeekCost 
 export { getDirectoryFingerprint } from './utils/jsonl.js';
 export * from './analytics.js';
 export * from './public-snapshot.js';
+export * from './private-snapshot.js';
