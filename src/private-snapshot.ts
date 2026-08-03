@@ -29,8 +29,8 @@ export function buildPrivateAnalyticsSnapshot(sessions: Session[], includeHistor
       // The project label keeps grouping useful without uploading the local directory tree.
       const project = cwd ? cwd.replace(/\\/g, '/').split('/').filter(Boolean).pop() : undefined;
       return includeHistory
-        ? structuredClone({ ...withoutSensitiveFields, file: 'remote', cwd: project, history })
-        : structuredClone({ ...withoutSensitiveFields, file: 'remote', cwd: project });
+        ? structuredClone({ ...withoutSensitiveFields, model: session.model || 'unknown', file: 'remote', cwd: project, history })
+        : structuredClone({ ...withoutSensitiveFields, model: session.model || 'unknown', file: 'remote', cwd: project });
     }),
   };
 }
